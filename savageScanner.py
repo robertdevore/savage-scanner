@@ -2,6 +2,7 @@ import requests
 import time
 import argparse
 import warnings
+import os
 from urllib3.exceptions import InsecureRequestWarning
 from datetime import datetime
 from tqdm import tqdm
@@ -15,14 +16,19 @@ def check_link(url, verify_ssl=True):
         pass
     return False
 
-def create_link_list_file(domain, current_time):
-    filename = f"{domain}_link_list_{current_time}.txt"
+def create_output_directory(domain, current_time):
+    """Create results directory structure: results/domain-timestamp/"""
+    output_dir = os.path.join("results", f"{domain}-{current_time}")
+    os.makedirs(output_dir, exist_ok=True)
+    return output_dir
+
+def create_link_list_file(domain, current_time, output_dir):
+    filename = os.path.join(output_dir, f"{domain}_link_list_{current_time}.txt")
     with open(filename, "w") as file:
         file.write("Link List:\n")
     return filename
 
-def append_link_to_file(url, domain, current_time):
-    filename = f"{domain}_link_list_{current_time}.txt"
+def append_link_to_file(url, filename):
     with open(filename, "a") as file:
         file.write(url + "\n")
 
@@ -32,7 +38,10 @@ def process_links(file_path, base_url, passive=False, delay=2, verify_ssl=True):
 
     domain = base_url.split("//")[-1].split("/")[0]
     current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    filename = create_link_list_file(domain, current_time)
+    
+    # Create organized output directory
+    output_dir = create_output_directory(domain, current_time)
+    filename = create_link_list_file(domain, current_time, output_dir)
 
     counter = 0
     pbar = None
@@ -47,7 +56,7 @@ def process_links(file_path, base_url, passive=False, delay=2, verify_ssl=True):
                     url = f"https://{domain}{line}"
                 if check_link(url, verify_ssl):
                     #print(f"Valid URL: {url}")
-                    append_link_to_file(url, domain, current_time)
+                    append_link_to_file(url, filename)
                     counter += 1
                 if passive:
                     time.sleep(delay)
@@ -59,6 +68,7 @@ def process_links(file_path, base_url, passive=False, delay=2, verify_ssl=True):
             pbar.close()
 
     print(f"Scan finished. {counter} results found and saved to {filename}")
+    print(f"Output directory: {output_dir}")
 
 # Example usage
 if __name__ == "__main__":

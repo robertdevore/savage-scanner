@@ -67,7 +67,15 @@ python3 savageScanner.py wordlist.txt https://example.com --passive 2 --verifyss
 
 #### Output
 
-A timestamped output file (e.g., `example.com_link_list_2024-12-23_12-34-56.txt`) containing:
+Results are organized in timestamped directories under `results/`:
+
+```
+results/
+  └── example.com-2024-12-23_12-34-56/
+      └── example.com_link_list_2024-12-23_12-34-56.txt
+```
+
+The output file contains:
 
 ```
 Link List:
@@ -81,18 +89,21 @@ https://targetwebsite.com/page3
 1. **Input Parsing**: Reads the input file line by line.
 2. **URL Construction**: Appends the base URL to relative paths.
 3. **Validation**: Sends an HTTP HEAD request to verify the URL.
-4. **Output**: Writes valid URLs to a timestamped file.
-5. **Progress Display**: Uses `tqdm` to show scanning progress.
-6. **Passive Mode**: Introduces a delay between requests if enabled.
+4. **Output Organization**: Creates organized directory structure for results.
+5. **Output**: Writes valid URLs to a timestamped file.
+6. **Progress Display**: Uses `tqdm` to show scanning progress.
+7. **Passive Mode**: Introduces a delay between requests if enabled.
 
 ## Code Structure
 
 - `**check_link(url, verify_ssl)**`:
     - Sends an HTTP HEAD request to validate the URL.
     - Returns `True` if the status code is 200, otherwise `False`.
-- `**create_link_list_file(domain, current_time)**`:
+- `**create_output_directory(domain, current_time)**`:
+    - Creates organized results directory structure.
+- `**create_link_list_file(domain, current_time, output_dir)**`:
     - Creates a timestamped output file for storing valid links.
-- `**append_link_to_file(url, domain, current_time)**`:
+- `**append_link_to_file(url, filename)**`:
     - Appends a valid URL to the output file.
 - `**process_links(file_path, base_url, passive, delay, verify_ssl)**`:
     - Processes the input file, constructs URLs, validates them, and writes valid ones to the output file.

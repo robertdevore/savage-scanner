@@ -36,15 +36,36 @@ pip install requests tqdm
 
 Run the script with the following arguments:
 
+```bash
+# Basic scan (sequential, safe but slow)
+python3 savageScanner.py wordlist.txt https://example.com
+
+# Passive mode (2 second delay between requests)
+python3 savageScanner.py wordlist.txt https://example.com --passive 2
+
+# Concurrent scanning (10 workers for 10x speed boost)
+python3 savageScanner.py wordlist.txt https://example.com --workers 10
+
+# Concurrent + passive (respectful but faster)
+python3 savageScanner.py wordlist.txt https://example.com --workers 10 --passive 0.5
+
+# Disable SSL verification (not recommended)
+python3 savageScanner.py wordlist.txt https://example.com --verifyssl
 ```
-python3 savageScanner.py file_path base_url [--passive DELAY] [--verifyssl]
-```
+
+### Performance Comparison
+
+- **Sequential** (`--workers 1`, default): ~1-2 hours for 500 URLs (safest)
+- **Low concurrency** (`--workers 5-10`): ~6-12 minutes for 500 URLs (good balance)
+- **High concurrency** (`--workers 20-50`): ~2-5 minutes for 500 URLs (aggressive)
+- **With passive mode**: Use `--workers 10 --passive 0.5` for respectful concurrent scanning
 
 ### Arguments
 
 - `file_path` (required): Path to the input file containing URLs or relative paths.
 - `base_url` (required): Base URL to prepend to relative paths in the input file.
 - `--passive` (optional): Enables passive mode and specifies a delay (in seconds) between requests.
+- `--workers` (optional): Number of concurrent workers (default: 1, sequential). Try 10-20 for speed.
 - `--verifyssl` (optional): Disables SSL certificate verification (not recommended for production).
 
 ### Example

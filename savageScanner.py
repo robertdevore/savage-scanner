@@ -6,6 +6,8 @@ import os
 from urllib3.exceptions import InsecureRequestWarning
 from datetime import datetime
 from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 
 def check_link(url, verify_ssl=True):
     try:
@@ -32,7 +34,28 @@ def append_link_to_file(url, filename):
     with open(filename, "a") as file:
         file.write(url + "\n")
 
-def process_links(file_path, base_url, passive=False, delay=2, verify_ssl=True):
+def check_single_link(line, domain, verify_ssl, passive, delay, filename, file_lock):
+    """Check a single link and write to file if valid. Returns 1 if found, 0 otherwise."""
+    line = line.strip()
+    if not line:
+        return 0
+    
+    if line.startswith("http://") or line.startswith("https://"):
+        url = line
+    else:
+        url = f"https://{domain}{line}"
+    
+    if passive:
+        time.sleep(delay)
+    
+    if check_link(url, verify_ssl):
+        # Thread-safe file writing
+        with file_lock:
+            append_link_to_file(url, filename)
+        return 1
+    return 0
+
+def process_links(file_path, base_url, passive=False, delay=2, verify_ssl=True, workers=1):
     with open(file_path, "r") as file:
         lines = file.readlines()
 
@@ -44,23 +67,35 @@ def process_links(file_path, base_url, passive=False, delay=2, verify_ssl=True):
     filename = create_link_list_file(domain, current_time, output_dir)
 
     counter = 0
+    file_lock = Lock()  # Thread-safe file writing
     pbar = None
+    
     try:
-        pbar = tqdm(total=len(lines), desc="Progress")
-        for line in lines:
-            line = line.strip()
-            if line:
-                if line.startswith("http://") or line.startswith("https://"):
-                    url = line
-                else:
-                    url = f"https://{domain}{line}"
-                if check_link(url, verify_ssl):
-                    #print(f"Valid URL: {url}")
-                    append_link_to_file(url, filename)
-                    counter += 1
-                if passive:
-                    time.sleep(delay)
+        pbar = tqdm(total=len(lines), desc="Progress", unit="url")
+        
+        if workers == 1:
+            # Sequential processing (original behavior)
+            for line in lines:
+                counter += check_single_link(line, domain, verify_ssl, passive, delay, filename, file_lock)
                 pbar.update(1)
+        else:
+            # Concurrent processing
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                # Submit all tasks
+                futures = {
+                    executor.submit(check_single_link, line, domain, verify_ssl, passive, delay, filename, file_lock): line 
+                    for line in lines
+                }
+                
+                # Process results as they complete
+                for future in as_completed(futures):
+                    try:
+                        counter += future.result()
+                    except Exception as e:
+                        # Silently handle errors (same as original behavior)
+                        pass
+                    pbar.update(1)
+                    
     except KeyboardInterrupt:
         print(f"\nUser stopped scan. {counter} results found and saved to {filename}")
     finally:
@@ -82,9 +117,10 @@ if __name__ == "__main__":
     parser.add_argument("base_url", help="Base URL to append the lines")
     parser.add_argument("--passive", type=float, help="Enable passive mode with a specified delay in seconds")
     parser.add_argument("--verifyssl", action="store_false", help="Disable SSL verification (not recommended in production)")
+    parser.add_argument("--workers", type=int, default=1, help="Number of concurrent workers (default: 1, sequential)")
     args = parser.parse_args()
 
     if args.passive:
-        process_links(args.file_path, args.base_url, passive=True, delay=args.passive, verify_ssl=args.verifyssl)
+        process_links(args.file_path, args.base_url, passive=True, delay=args.passive, verify_ssl=args.verifyssl, workers=args.workers)
     else:
-        process_links(args.file_path, args.base_url, verify_ssl=args.verifyssl)
+        process_links(args.file_path, args.base_url, verify_ssl=args.verifyssl, workers=args.workers)
